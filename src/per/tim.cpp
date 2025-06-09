@@ -296,7 +296,7 @@ extern "C"
             /** @todo make this conditional based on user config */
             if(cfg.enable_irq)
             {
-                HAL_NVIC_SetPriority(TIM5_IRQn, 0x0, 0);
+                HAL_NVIC_SetPriority(TIM5_IRQn, 0x0f, 0);
                 HAL_NVIC_EnableIRQ(TIM5_IRQn);
             }
         }
