@@ -75,10 +75,18 @@ class MappedFloatValue : public MappedValue
 
     ~MappedFloatValue() override {}
 
+    // Percent of total range
     inline void SetNormalizedStepSizes(float coarse, float fine)
     {
         coarseStepSize0to1_ = coarse;
         fineStepSize0to1_   = fine;
+    }
+
+    // Absolute step
+    inline void SetAbsoluteStepSizes(float coarse, float fine)
+    {
+        coarseStepSize0to1_ = coarse / (max_ - min_);
+        fineStepSize0to1_   = fine / (max_ - min_);
     }
 
     /** Returns the current value. */
