@@ -36,6 +36,9 @@ class LoggerImpl
     /** Transmit a block of data
      */
     static bool Transmit(const void* buffer, size_t bytes) { return true; }
+
+    /** Wait for host connection, this is only for USB */
+    static void WaitForHostConnection() {}
 };
 
 
@@ -62,6 +65,15 @@ class LoggerImpl<LOGGER_INTERNAL>
     {
         return UsbHandle::Result::OK
                == usb_handle_.TransmitInternal((uint8_t*)buffer, bytes);
+    }
+
+    /** Wait for host connection */
+    static void WaitForHostConnection()
+    {
+        while(!usb_handle_.IsConnected())
+        {
+            usb_handle_.RunTask();
+        }
     }
 
   protected:
@@ -96,6 +108,15 @@ class LoggerImpl<LOGGER_EXTERNAL>
                == usb_handle_.TransmitExternal((uint8_t*)buffer, bytes);
     }
 
+    /** Wait for host connection */
+    static void WaitForHostConnection()
+    {
+        while(!usb_handle_.IsConnected())
+        {
+            usb_handle_.RunTask();
+        }
+    }
+
   protected:
     /** USB Handle for CDC transfers
      */
@@ -121,9 +142,12 @@ class LoggerImpl<LOGGER_SEMIHOST>
             write(STDOUT_FILENO, buffer, bytes);
         return true;
     }
+
+    /** Wait for host connection */
+    static void WaitForHostConnection() {}
 };
 
-template<>
+template <>
 class LoggerImpl<LOGGER_UART_7>
 {
   public:
@@ -147,6 +171,8 @@ class LoggerImpl<LOGGER_UART_7>
         return UartHandler::Result::OK
                == uart_handle_.BlockingTransmit((uint8_t*)buffer, bytes);
     }
+    /** Wait for host connection */
+    static void WaitForHostConnection() {}
 
   protected:
     /** UART handle for transfers */

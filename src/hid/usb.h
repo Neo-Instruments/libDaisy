@@ -10,7 +10,7 @@ namespace daisy
 */
 
 {
-/** 
+/**
     @brief Interface for initializing and using the USB Peripherals on the daisy
     @author Stephen Hensley
     @date December 2019
@@ -51,7 +51,7 @@ class UsbHandle
      */
     void DeInit(UsbPeriph dev);
 
-    /** Transmits a buffer of 'size' bytes from the on board USB FS port. 
+    /** Transmits a buffer of 'size' bytes from the on board USB FS port.
     \param buff Buffer to transmit
     \param size Buffer size
      */
@@ -68,6 +68,19 @@ class UsbHandle
     \param dev Device to set callback for
      */
     void SetReceiveCallback(ReceiveCallback cb, UsbPeriph dev);
+
+    /**
+     * @brief Check if USB CDC is connected to a host
+     * @return true if connected, false otherwise
+     */
+    bool IsConnected() const;
+
+    // For tinyusb-
+    //
+    // Recommend calling from 1ms timer for MIDI/CDC
+    // or 100uS timer if USB audio class enabled
+    // (for audio, ISR must be highest priority, supersede audio callback)
+    void RunTask();
 
   private:
 };

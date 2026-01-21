@@ -48,7 +48,13 @@ template <LoggerDestination dest>
 void Logger<dest>::StartLog(bool wait_for_pc)
 {
     impl_.Init();
-    /* if waiting for PC, use blocking transmission */
+
+    /* if waiting for PC, wait until host connects */
+    if(wait_for_pc)
+    {
+        impl_.WaitForHostConnection();
+    }
+
     pc_sync_ = wait_for_pc ? LOGGER_SYNC_IN : LOGGER_SYNC_OUT;
     /** transmit something to stall the UART until a terminal is connected
      * at least two separate calls are required
@@ -123,7 +129,7 @@ template class Logger<LOGGER_SEMIHOST>;
 template class Logger<LOGGER_UART_7>;
 
 /** LoggerImpl static member variables */
-UsbHandle   LoggerImpl<LOGGER_INTERNAL>::usb_handle_;
-UsbHandle   LoggerImpl<LOGGER_EXTERNAL>::usb_handle_;
+UsbHandle LoggerImpl<LOGGER_INTERNAL>::usb_handle_;
+UsbHandle LoggerImpl<LOGGER_EXTERNAL>::usb_handle_;
 UartHandler LoggerImpl<LOGGER_UART_7>::uart_handle_;
 } // namespace daisy

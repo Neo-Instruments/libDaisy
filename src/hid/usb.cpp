@@ -3,6 +3,7 @@
 #include "usbd_desc.h"
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
+#include "tusb.h"
 
 using namespace daisy;
 
@@ -17,6 +18,8 @@ extern "C"
     extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
     extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
+    static volatile bool is_tud_task_busy = false;
+
     void DummyRxCallback(uint8_t* buf, uint32_t* size)
     {
         // Do Nothing
@@ -24,31 +27,43 @@ extern "C"
 
     CDC_ReceiveCallback rxcallback;
 
-    uint8_t usbd_mode = USBD_MODE_CDC;
+    // uint8_t usbd_mode = USBD_MODE_CDC;
 }
 
 UsbHandle::ReceiveCallback rx_callback;
+uint8_t                    usb_fs_hw_initialized = 0;
+uint8_t                    usb_hs_hw_initialized = 0;
 
 static void InitFS()
 {
-    rx_callback = DummyRxCallback;
-    if(USBD_Init(&hUsbDeviceFS, &FS_Desc, DEVICE_FS) != USBD_OK)
+    rx_callback      = DummyRxCallback;
+    is_tud_task_busy = false;
+    // BUG: this can't be called multiple times. Need to have
+    // a check to ensure it's not been called before.
+    if(usb_fs_hw_initialized == 0)
     {
-        UsbErrorHandler();
+        usb_fs_hw_initialized = 1;
+        if(USBD_Init(&hUsbDeviceFS, NULL, DEVICE_FS) != USBD_OK)
+        {
+            UsbErrorHandler();
+        }
+        tusb_rhport_init_t dev_init
+            = {.role = TUSB_ROLE_DEVICE, .speed = TUSB_SPEED_AUTO};
+        tusb_init(0, &dev_init);
     }
-    if(USBD_RegisterClass(&hUsbDeviceFS, &USBD_CDC) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_CDC_RegisterInterface(&hUsbDeviceFS, &USBD_Interface_fops_FS)
-       != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_Start(&hUsbDeviceFS) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
+    // if(USBD_RegisterClass(&hUsbDeviceFS, &USBD_CDC) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_CDC_RegisterInterface(&hUsbDeviceFS, &USBD_Interface_fops_FS)
+    //    != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_Start(&hUsbDeviceFS) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
 }
 
 static void DeinitFS()
@@ -62,23 +77,38 @@ static void DeinitFS()
 static void InitHS()
 {
     // HS as FS
-    if(USBD_Init(&hUsbDeviceHS, &HS_Desc, DEVICE_HS) != USBD_OK)
+    // if(USBD_Init(&hUsbDeviceHS, &HS_Desc, DEVICE_HS) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // a check to ensure it's not been called before.
+    rx_callback      = DummyRxCallback;
+    is_tud_task_busy = false;
+    if(usb_hs_hw_initialized == 0)
     {
-        UsbErrorHandler();
+        usb_hs_hw_initialized = 1;
+        if(USBD_Init(&hUsbDeviceHS, NULL, DEVICE_HS) != USBD_OK)
+        {
+            UsbErrorHandler();
+        }
+        tusb_rhport_init_t dev_init
+            = {.role = TUSB_ROLE_DEVICE, .speed = TUSB_SPEED_AUTO};
+        tusb_init(1, &dev_init);
     }
-    if(USBD_RegisterClass(&hUsbDeviceHS, &USBD_CDC) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_CDC_RegisterInterface(&hUsbDeviceHS, &USBD_Interface_fops_HS)
-       != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
-    if(USBD_Start(&hUsbDeviceHS) != USBD_OK)
-    {
-        UsbErrorHandler();
-    }
+
+    // if(USBD_RegisterClass(&hUsbDeviceHS, &USBD_CDC) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_CDC_RegisterInterface(&hUsbDeviceHS, &USBD_Interface_fops_HS)
+    //    != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
+    // if(USBD_Start(&hUsbDeviceHS) != USBD_OK)
+    // {
+    //     UsbErrorHandler();
+    // }
 }
 
 static void DeinitHS()
@@ -122,13 +152,19 @@ void UsbHandle::DeInit(UsbPeriph dev)
     HAL_PWREx_DisableUSBVoltageDetector();
 }
 
+// TODO: these are the same for current tinyusb implementation,
+// should be using separate USB periph interfaces if possible
 UsbHandle::Result UsbHandle::TransmitInternal(uint8_t* buff, size_t size)
 {
-    return CDC_Transmit_FS(buff, size) == USBD_OK ? Result::OK : Result::ERR;
+    auto ret = tud_cdc_write(buff, size) == size ? Result::OK : Result::ERR;
+    tud_cdc_write_flush();
+    return ret;
 }
 UsbHandle::Result UsbHandle::TransmitExternal(uint8_t* buff, size_t size)
 {
-    return CDC_Transmit_HS(buff, size) == USBD_OK ? Result::OK : Result::ERR;
+    auto ret = tud_cdc_write(buff, size) == size ? Result::OK : Result::ERR;
+    tud_cdc_write_flush();
+    return ret;
 }
 
 void UsbHandle::SetReceiveCallback(ReceiveCallback cb, UsbPeriph dev)
@@ -146,6 +182,21 @@ void UsbHandle::SetReceiveCallback(ReceiveCallback cb, UsbPeriph dev)
             CDC_Set_Rx_Callback_HS(rxcallback);
             break;
         default: break;
+    }
+}
+
+bool UsbHandle::IsConnected() const
+{
+    return tud_cdc_connected();
+}
+
+void UsbHandle::RunTask()
+{
+    if(!is_tud_task_busy)
+    {
+        is_tud_task_busy = true;
+        tud_task();
+        is_tud_task_busy = false;
     }
 }
 
@@ -170,5 +221,8 @@ extern "C"
         HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
     }
 
-    void OTG_FS_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS); }
+    void OTG_FS_IRQHandler(void)
+    {
+        tusb_int_handler(0, true);
+    }
 }
