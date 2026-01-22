@@ -25,6 +25,9 @@
 
 #include "tusb.h"
 #include "usb_descriptors.h"
+#include <stm32h7xx_hal.h>
+#include <string.h>
+#include <stdio.h>
 
 /* A combination of interfaces must have a unique product id, since PC will save
  * device driver after the first plug. Same VID/PID with different interface e.g
@@ -142,10 +145,10 @@ enum
 char const *string_desc_arr[] = {
     (const char[]){0x09, 0x04}, // 0: is supported language is English (0x0409)
     "Neo Instruments",          // 1: Manufacturer
-    "Ventilator",               // 2: Product
+    "Ventilator 3",             // 2: Product
     NULL,                       // 3: Serials will use unique ID if possible
-    "Ventilator MIDI",          // 4: MIDI Interface
-    "Ventilator Serial",        // 5: CDC Interface
+    "Ventilator 3 MIDI",        // 4: MIDI Interface
+    "Ventilator 3 Serial",      // 5: CDC Interface
 };
 
 static inline size_t board_usb_get_serial(uint16_t desc_str1[],
