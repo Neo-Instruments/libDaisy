@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 // TODO: make this adjustable
-#define SYSEX_BUFFER_LEN 16
+#define SYSEX_BUFFER_LEN 64
 
 namespace daisy
 {
